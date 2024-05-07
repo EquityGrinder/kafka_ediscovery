@@ -36,6 +36,9 @@ class KafkaConfig(BaseModel):
     consumer_topic: str = "test_consumer"
     producer_topic: str = "test_producer"
 
+    log_file: str = "logs/kafka_api.log"
+    logger_name: str = "KafkaAPI"
+
     def get_bootstrap_servers(self):
         """
         Get the bootstrap servers in the format of "host:port".
@@ -68,22 +71,6 @@ class KafkaConfig(BaseModel):
             - Check the existence of the topic before changing.
         """
         self.producer_topic = topic
-
-
-class MilvusConfig(BaseModel):
-    """
-    A class handling configurations from Milvus.
-
-    This class represents the configuration settings for connecting to a Milvus server.
-    It provides default values for the host and port, which can be overridden if needed.
-
-    Attributes:
-        host (str): The host address of the Milvus server. Defaults to "milvus.dev.io".
-        port (int): The port number of the Milvus server. Defaults to 19530.
-    """
-
-    host: str = "milvus.dev.io"
-    port: int = 19530
 
 
 class LoggingConfig(BaseModel):

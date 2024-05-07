@@ -40,6 +40,7 @@ class KafkaAPI(BaseModel):
         self.producer = Producer(
             {"bootstrap.servers": self.config.get_bootstrap_servers()}
         )
+
         self.consumer = Consumer(
             {
                 "bootstrap.servers": self.config.get_bootstrap_servers(),
@@ -47,10 +48,9 @@ class KafkaAPI(BaseModel):
                 "auto.offset.reset": "earliest",
             }
         )
-        logging_conf = LoggingConfig(log_file="logs/kafka_api.log")
-        logger = logging_conf.setup_logger("KafkaAPI")
 
-        self.logger = logger
+        logging_conf = LoggingConfig(log_file=self.config.log_file)
+        self.logger = logging_conf.setup_logger(self.config.logger_name)
 
     def serialize_data(self, data: BaseModel):
         """
