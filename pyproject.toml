@@ -1,0 +1,17 @@
+[tool.poetry]
+name = "kafka_ediscovery"
+version = "0.1.0"
+description = ""
+authors = ["EquityGrinder <duckdonald580@gmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "3.11.2"
+pydantic = "*"
+confluent-kafka = "*"
+pytest = "*"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
