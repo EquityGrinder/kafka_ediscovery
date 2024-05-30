@@ -66,3 +66,6 @@ def test_write_data_and_read_data(kafka_api):
     kafka_api.config.change_consumer_topic("test_producer")
 
     assert kafka_api.read_data(data) == data
+
+if __name__ == "__main__":
+    test_write_data_and_read_data(kafka_api=KafkaAPI())

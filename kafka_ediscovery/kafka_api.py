@@ -52,14 +52,6 @@ class KafkaAPI(BaseModel):
         logging_conf = LoggingConfig(log_file=self.config.log_file)
         self.logger = logging_conf.setup_logger(self.config.logger_name)
 
-    def copy(self, *, deep: bool = False) -> "KafkaAPI":
-        """
-        Returns a copy of the object.
-
-        Args:
-            deep: If True, also copy the contents of the object.
-        """
-        return KafkaAPI(config=self.config, producer=self.producer, consumer=self.consumer, logger=self.logger)
 
     def serialize_data(self, data: BaseModel):
         """
