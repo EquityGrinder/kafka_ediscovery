@@ -25,14 +25,21 @@ class KafkaAPI(BaseModel):
     producer: Optional[Producer] = None
     consumer: Optional[Consumer] = None
     logger: Optional[Logger] = None
-
+    max_messages: int = 100
     model_config: ConfigDict = {"arbitrary_types_allowed": True}
+
+    def __del__(self) -> None:
+        if self.producer:
+            self.producer.flush()
+        if self.consumer:
+            self.consumer.close()
 
     def __init__(self):
         """
         Todo: Check if more configuration options are needed for the producer
         and consumer.
         """
+
         BaseModel.__init__(self)
         if not self.config:
             self.config = KafkaConfig()
@@ -52,6 +59,7 @@ class KafkaAPI(BaseModel):
         logging_conf = LoggingConfig(log_file=self.config.log_file)
         self.logger = logging_conf.setup_logger(self.config.logger_name)
 
+        self.subscribe(self.config.consumer_topic)
 
     def serialize_data(self, data: BaseModel):
         """
@@ -168,10 +176,67 @@ class KafkaAPI(BaseModel):
                 data = msg.value().decode("utf-8")
                 self.logger.info(f"Read data: {data}")
 
-        self.consumer.close()
-
         ### FIXX FOR ONLY ONE MESSAGE
         return self.deserialize_data(data, data_container)
+
+    def get_end_offsets(self) -> list[TopicPartition]:
+        """
+        Setst the consumer to high watermark and returns the offsets
+        """
+        self.consumer.poll(0)
+        metadata = self.consumer.list_topics(self.config.consumer_topic)
+        partitions = metadata.topics[
+            self.config.consumer_topic
+        ].partitions.keys()
+
+        for partition in partitions:
+            tp = TopicPartition(self.config.consumer_topic, partition)
+
+            # Manually assign the consumer to a partition
+            self.consumer.assign([tp])
+            # Get the high watermark for the partition
+            _, high_watermark = self.consumer.get_watermark_offsets(
+                tp, timeout=1
+            )
+
+            tp.offset = high_watermark
+            self.consumer.assign([tp])
+
+        return self.consumer.assignment()
+
+    def read_since(
+        self, data_container: BaseModel, offsets: list[TopicPartition]
+    ) -> list[BaseModel]:
+
+        data_collection = []
+        # assign to the offsets
+        for tp in offsets:
+            if tp.offset != -1:
+                self.consumer.assign(
+                    [
+                        TopicPartition(
+                            self.config.consumer_topic, tp.partition, tp.offset
+                        )
+                    ]
+                )
+
+        for i in range(0, self.max_messages):
+            msg = self.consumer.poll(1.0)
+
+            if msg is None:
+                break
+            if msg.error():
+                print("Consumer error: {}".format(msg.error()))
+                break
+            else:
+                print(
+                    "Received message: {}".format(msg.value().decode("utf-8"))
+                )
+                data = msg.value().decode("utf-8")
+                data = self.deserialize_data(data, data_container)
+                data_collection.append(msg.value().decode("utf-8"))
+
+        return data_collection
 
     def change_consumer_topic(self, topic: str):
         """
@@ -181,6 +246,7 @@ class KafkaAPI(BaseModel):
             topic: The new topic to subscribe to.
         """
         self.config.change_consumer_topic(topic)
+        self.subscribe(topic)
 
     def change_producer_topic(self, topic: str):
         """
@@ -190,3 +256,14 @@ class KafkaAPI(BaseModel):
             topic: The new topic to produce to.
         """
         self.config.change_producer_topic(topic)
+
+    def subscribe(self, topic: str):
+        """
+        Subscribes to the given topic.
+
+        Args:
+            topic: The topic to subscribe to.
+        """
+        self.consumer.subscribe([topic])
+        self.consumer.poll(0)
+        self.logger.info(f"Subscribed to topic: {topic}")

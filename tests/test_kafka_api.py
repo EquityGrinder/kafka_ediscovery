@@ -1,3 +1,5 @@
+from time import sleep
+
 import pytest
 from pydantic import BaseModel
 
@@ -67,5 +69,22 @@ def test_write_data_and_read_data(kafka_api):
 
     assert kafka_api.read_data(data) == data
 
-if __name__ == "__main__":
-    test_write_data_and_read_data(kafka_api=KafkaAPI())
+
+def test_read_since(kafka_api):
+    test_data = TestData()
+    kafka_api.change_consumer_topic(kafka_api.config.producer_topic)
+
+    kafka_api.write_data(test_data)
+    kafka_api.write_data(test_data)
+    kafka_api.write_data(test_data)
+    kafka_api.write_data(test_data)
+
+    positions = kafka_api.get_end_offsets()
+
+    for i in range(10):
+        test_data.id += 1
+        kafka_api.write_data(test_data)
+
+    records = kafka_api.read_since(test_data, positions)
+
+    assert len(records) == 10

@@ -18,7 +18,8 @@ class KafkaConfig(BaseModel):
     """
     Configuration class for Kafka settings.
 
-    This class represents the configuration settings for Kafka, including the host address, port number,
+    This class represents the configuration settings for Kafka, including
+    the host address, port number,
     consumer group ID, consumer topic name, and producer topic name.
 
     Attributes:
