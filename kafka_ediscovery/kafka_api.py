@@ -86,7 +86,7 @@ class KafkaAPI(BaseModel):
             model_class: Pydantic model class to deserialize into
         """
         self.logger.info(f"Deserializing data: {data}")
-        return model_class.parse_raw(data)
+        return model_class.model_validate_json(data)
 
     def write_data(self, data: BaseModel):
         """
@@ -234,7 +234,7 @@ class KafkaAPI(BaseModel):
                 )
                 data = msg.value().decode("utf-8")
                 data = self.deserialize_data(data, data_container)
-                data_collection.append(msg.value().decode("utf-8"))
+                data_collection.append(data)
 
         return data_collection
 
