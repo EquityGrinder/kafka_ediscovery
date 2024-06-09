@@ -52,7 +52,7 @@ class KafkaAPI(BaseModel):
             {
                 "bootstrap.servers": self.config.get_bootstrap_servers(),
                 "group.id": self.config.group_id,
-                "auto.offset.reset": "earliest",
+                "auto.offset.reset": "latest",
             }
         )
 
