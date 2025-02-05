@@ -176,3 +176,6 @@ kafka_ediscovery/__pycache__/config.cpython-311.pyc
 kafka_ediscovery/__pycache__/config.cpython-311.pyc
 kafka_ediscovery/__pycache__/kafka_api.cpython-311.pyc
 tests/__pycache__/test_kafka_api.cpython-311-pytest-8.2.0.pyc
+kafka_ediscovery/__pycache__/config.cpython-311.pyc
+kafka_ediscovery/__pycache__/kafka_api.cpython-311.pyc
+tests/__pycache__/test_kafka_api.cpython-311-pytest-8.2.0.pyc
