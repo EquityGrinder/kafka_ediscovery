@@ -1,4 +1,5 @@
 from time import sleep
+from unittest.mock import MagicMock, patch
 
 import pytest
 from pydantic import BaseModel
@@ -20,12 +21,17 @@ class TestData(BaseModel):
 
 @pytest.fixture
 def kafka_api():
-    config = KafkaConfig()
     return KafkaAPI()
 
 
+def test_consume_callback(kafka_api):
+    def test_function(data):
+        print(data)
+
+    kafka_api.consume_callback(TestData, test_function)
+
+
 def test_serialize_data(kafka_api):
-    # TODO: Add test case for serialize_data method
     # Create a sample data to serialize
     data = TestData()
 
@@ -35,12 +41,11 @@ def test_serialize_data(kafka_api):
     # Assert that the serialized data is not empty
     assert serialized_data is not None
 
-    # Assert that the serialized data is of type bytes
+    # Assert that the serialized data is of type str
     assert isinstance(serialized_data, str)
 
 
 def test_deserialize_data(kafka_api):
-    # TODO: Add test case for deserialize_data method
     # Create a sample serialized data
     test_string = TestData().model_dump_json()
     # Deserialize the data
@@ -58,8 +63,19 @@ def test_deserialize_data(kafka_api):
     assert deserialized_data.is_active is True
 
 
+def test_create_topic(kafka_api):
+    kafka_api.config.producer_topic = "test_consumer"
+
+    # Create the topic
+    kafka_api.create_topic(num_partitions=1, replication_factor=1)
+
+    # Verify the topic was created
+    topics = kafka_api.admin_client.list_topics().topics
+    assert "test_consumer" in topics
+    kafka_api.logger.info("test_consumer topic created successfully")
+
+
 def test_write_data_and_read_data(kafka_api):
-    # TODO: Add test case for write_data method
     # Create a sample data to write
     data = TestData()
     # Write the data
@@ -67,7 +83,8 @@ def test_write_data_and_read_data(kafka_api):
 
     kafka_api.config.change_consumer_topic("test_producer")
 
-    assert kafka_api.read_data(data) == data
+    read_data = kafka_api.read_data(TestData)
+    assert read_data == data
 
 
 def test_read_since(kafka_api):
@@ -88,3 +105,127 @@ def test_read_since(kafka_api):
     records = kafka_api.read_since(test_data, positions)
 
     assert len(records) == 10
+
+
+def test_change_consumer_topic(kafka_api):
+    new_topic = "new_consumer_topic"
+    kafka_api.change_consumer_topic(new_topic)
+    assert kafka_api.config.consumer_topic == new_topic
+    kafka_api.logger.info(f"Consumer topic changed to {new_topic}")
+
+
+def test_change_producer_topic(kafka_api):
+    new_topic = "new_producer_topic"
+    kafka_api.change_producer_topic(new_topic)
+    assert kafka_api.config.producer_topic == new_topic
+    kafka_api.logger.info(f"Producer topic changed to {new_topic}")
+
+
+def test_subscribe(kafka_api):
+    new_topic = "new_subscribe_topic"
+    kafka_api.subscribe(new_topic)
+    assert kafka_api.config.consumer_topic == new_topic
+    kafka_api.logger.info(f"Subscribed to topic {new_topic}")
+
+
+def test_consume_callback_with_mock(kafka_api):
+    mock_callback = MagicMock()
+    kafka_api.consume_callback(TestData, mock_callback)
+    mock_callback.assert_called()
+    kafka_api.logger.info("Callback function called successfully")
+
+
+def test_write_and_read_multiple_data(kafka_api):
+    data_list = [
+        TestData(id=i, name=f"test_{i}", value=float(i), is_active=bool(i % 2))
+        for i in range(5)
+    ]
+    for data in data_list:
+        kafka_api.write_data(data)
+
+    kafka_api.config.change_consumer_topic("test_producer")
+
+    for data in data_list:
+        read_data = kafka_api.read_data(TestData)
+        assert read_data == data
+        kafka_api.logger.info(f"Data {data} read successfully")
+
+
+def test_create_and_verify_topic(kafka_api):
+    topic_name = "verify_topic_creation"
+    kafka_api.config.producer_topic = topic_name
+    kafka_api.create_topic(num_partitions=1, replication_factor=1)
+
+    topics = kafka_api.admin_client.list_topics().topics
+    assert topic_name in topics
+    kafka_api.logger.info(
+        f"Topic {topic_name} created and verified successfully"
+    )
+
+
+def test_get_end_offsets(kafka_api):
+    # Set the same topic for both consumer and producer
+    topic_name = "test_topic"
+    kafka_api.config.producer_topic = topic_name
+    kafka_api.config.consumer_topic = topic_name
+
+    # Check if the topic exists
+    topics = kafka_api.admin_client.list_topics().topics
+    if topic_name not in topics:
+        # Create the topic if it does not exist
+        kafka_api.create_topic(num_partitions=1, replication_factor=1)
+
+        # Verify the topic was created
+        topics = kafka_api.admin_client.list_topics().topics
+        assert topic_name in topics, f"Topic {topic_name} was not created"
+        kafka_api.logger.info(f"Topic {topic_name} created successfully")
+    else:
+        kafka_api.logger.info(f"Topic {topic_name} already exists")
+
+    # Write some initial test data to ensure there are offsets
+    test_data = TestData()
+    kafka_api.write_data(test_data)
+    kafka_api.write_data(test_data)
+
+    # Get the initial end offsets
+    initial_end_offsets = kafka_api.get_end_offsets()
+
+    # Verify that the initial end offsets are greater than or equal to 0
+    for tp in initial_end_offsets:
+        assert (
+            tp.offset >= 0
+        ), f"Offset for partition {tp.partition} is {tp.offset}"
+
+    # Write additional test data
+    kafka_api.write_data(test_data)
+    kafka_api.write_data(test_data)
+
+    # Get the new end offsets
+    new_end_offsets = kafka_api.get_end_offsets()
+
+    # Verify that the new end offsets are greater than the initial end offsets
+    for initial_tp, new_tp in zip(initial_end_offsets, new_end_offsets):
+        assert (
+            new_tp.offset > initial_tp.offset
+        ), f"New offset {new_tp.offset} is not greater than initial offset {initial_tp.offset}"
+
+    kafka_api.logger.info("End offsets updated successfully")
+
+
+def test_topic_exists(kafka_api):
+    topic_name = "test_topic_exists"
+
+    # Ensure the topic does not exist initially
+    assert not kafka_api.topic_exists(
+        topic_name
+    ), f"Topic {topic_name} should not exist initially"
+
+    # Create the topic
+    kafka_api.create_topic(num_partitions=1, replication_factor=1)
+
+    # Verify the topic was created
+    assert kafka_api.topic_exists(
+        topic_name
+    ), f"Topic {topic_name} should exist after creation"
+
+    kafka_api.logger.info(f"Topic {topic_name} existence check passed")
