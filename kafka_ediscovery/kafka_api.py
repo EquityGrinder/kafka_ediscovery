@@ -114,7 +114,9 @@ class KafkaAPI(BaseModel):
             f"Data written to Kafka topic: {self.config.producer_topic}"
         )
 
-    def read_data(self, data_container: BaseModel, n: int = 1):
+    def read_data(
+        self, data_container: BaseModel, n: int = 1
+    ) -> list[BaseModel]:
         """
         Reads data from the Kafka consumer and returns the deserialized data.
         It reads the last n messages.
@@ -170,6 +172,7 @@ class KafkaAPI(BaseModel):
         # Assign the consumer to the TopicPartitions
         self.consumer.assign(tps)
 
+        messages = []
         for i in range(n):
             msg = self.consumer.poll(1.0)
             if msg is None:
@@ -180,9 +183,9 @@ class KafkaAPI(BaseModel):
             else:
                 data = msg.value().decode("utf-8")
                 self.logger.info(f"Read data: {data}")
+                messages.append(self.deserialize_data(data, data_container))
 
-        ### FIXX FOR ONLY ONE MESSAGE
-        return self.deserialize_data(data, data_container)
+        return messages if n > 1 else messages[0]
 
     def get_end_offsets(self) -> list[TopicPartition]:
         """
@@ -375,11 +378,12 @@ class KafkaAPI(BaseModel):
 
     def subscribe(self, topic: str):
         """
-        Subscribes to the given topic.
+        Subscribes to the given topic and sets the consumer topic in the config.
 
         Args:
             topic: The topic to subscribe to.
         """
+        self.config.consumer_topic = topic
         self.consumer.subscribe([topic])
         self.consumer.poll(0)
         self.logger.info(f"Subscribed to topic: {topic}")

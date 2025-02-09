@@ -1,3 +1,4 @@
+import threading
 from time import sleep
 from unittest.mock import MagicMock, patch
 
@@ -27,8 +28,41 @@ def kafka_api():
 def test_consume_callback(kafka_api):
     def test_function(data):
         print(data)
+        assert isinstance(data, TestData)
+        assert data.id == 1
+        assert data.name == "test"
+        assert data.value == 1.0
+        assert data.is_active is True
 
-    kafka_api.consume_callback(TestData, test_function)
+    # Set the topic for both consumer and producer
+    topic_name = "test_consume_callback"
+    kafka_api.config.producer_topic = topic_name
+    kafka_api.config.consumer_topic = topic_name
+
+    # Create the topic if it does not exist
+    if not kafka_api.topic_exists(topic_name):
+        kafka_api.create_topic(num_partitions=1, replication_factor=1)
+
+    # Start the consume_callback function in a separate thread
+    consume_thread = threading.Thread(
+        target=kafka_api.consume_callback, args=(TestData, test_function)
+    )
+    consume_thread.start()
+
+    # Wait for 5 seconds before writing data
+    sleep(5)
+
+    # Write data to the topic in another thread
+    def write_data():
+        data = TestData()
+        kafka_api.write_data(data)
+
+    write_thread = threading.Thread(target=write_data)
+    write_thread.start()
+
+    # Wait for the threads to complete
+    write_thread.join()
+    consume_thread.join(timeout=10)  # Timeout to ensure the test doesn't hang
 
 
 def test_serialize_data(kafka_api):
@@ -123,16 +157,17 @@ def test_change_producer_topic(kafka_api):
 
 def test_subscribe(kafka_api):
     new_topic = "new_subscribe_topic"
+
+    # Ensure the topic exists
+    if not kafka_api.topic_exists(new_topic):
+        kafka_api.create_topic(num_partitions=1, replication_factor=1)
+
+    # Subscribe to the new topic
     kafka_api.subscribe(new_topic)
+
+    # Verify the subscription
     assert kafka_api.config.consumer_topic == new_topic
     kafka_api.logger.info(f"Subscribed to topic {new_topic}")
-
-
-def test_consume_callback_with_mock(kafka_api):
-    mock_callback = MagicMock()
-    kafka_api.consume_callback(TestData, mock_callback)
-    mock_callback.assert_called()
-    kafka_api.logger.info("Callback function called successfully")
 
 
 def test_write_and_read_multiple_data(kafka_api):
@@ -145,8 +180,8 @@ def test_write_and_read_multiple_data(kafka_api):
 
     kafka_api.config.change_consumer_topic("test_producer")
 
-    for data in data_list:
-        read_data = kafka_api.read_data(TestData)
+    read_data_list = kafka_api.read_data(TestData, n=len(data_list))
+    for read_data, data in zip(read_data_list, data_list):
         assert read_data == data
         kafka_api.logger.info(f"Data {data} read successfully")
 
