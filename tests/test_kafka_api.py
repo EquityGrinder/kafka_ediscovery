@@ -214,8 +214,19 @@ def test_get_end_offsets(kafka_api):
 
 def test_topic_exists(kafka_api):
     topic_name = "test_topic_exists"
+    kafka_api.config.producer_topic = topic_name
 
     # Ensure the topic does not exist initially
+    if kafka_api.topic_exists(topic_name):
+        kafka_api.delete_topic(topic_name)
+        # Wait for the topic to be fully deleted
+        for _ in range(10):
+            if not kafka_api.topic_exists(topic_name):
+                break
+            sleep(1)
+        else:
+            raise Exception(f"Topic {topic_name} was not deleted in time")
+
     assert not kafka_api.topic_exists(
         topic_name
     ), f"Topic {topic_name} should not exist initially"
@@ -229,3 +240,44 @@ def test_topic_exists(kafka_api):
     ), f"Topic {topic_name} should exist after creation"
 
     kafka_api.logger.info(f"Topic {topic_name} existence check passed")
+
+    # Delete the topic
+    kafka_api.delete_topic(topic_name)
+
+    # Wait for the topic to be fully deleted
+    for _ in range(10):
+        if not kafka_api.topic_exists(topic_name):
+            break
+        sleep(1)
+    else:
+        raise Exception(f"Topic {topic_name} was not deleted in time")
+
+    # Verify the topic was deleted
+    assert not kafka_api.topic_exists(
+        topic_name
+    ), f"Topic {topic_name} should not exist after deletion"
+
+    kafka_api.logger.info(f"Topic {topic_name} deletion check passed")
+
+
+def test_delete_topic(kafka_api):
+    topic_name = "test_topic_delete"
+
+    # Create the topic
+    kafka_api.config.producer_topic = topic_name
+    kafka_api.create_topic(num_partitions=1, replication_factor=1)
+
+    # Verify the topic was created
+    assert kafka_api.topic_exists(
+        topic_name
+    ), f"Topic {topic_name} should exist after creation"
+
+    # Delete the topic
+    kafka_api.delete_topic(topic_name)
+
+    # Verify the topic was deleted
+    assert not kafka_api.topic_exists(
+        topic_name
+    ), f"Topic {topic_name} should not exist after deletion"
+
+    kafka_api.logger.info(f"Topic {topic_name} deletion check passed")

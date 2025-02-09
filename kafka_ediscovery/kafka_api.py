@@ -255,6 +255,25 @@ class KafkaAPI(BaseModel):
             except Exception as e:
                 self.logger.error(f"Failed to create topic {topic}: {e}")
 
+    def delete_topic(self, topic_name: str):
+        """
+        Deletes a Kafka topic.
+
+        Args:
+            topic_name: The name of the topic to delete.
+
+        Returns:
+            None
+        """
+        fs = self.admin_client.delete_topics([topic_name])
+
+        for topic, f in fs.items():
+            try:
+                f.result()  # The result itself is None
+                self.logger.info(f"Topic {topic} deleted successfully")
+            except Exception as e:
+                self.logger.error(f"Failed to delete topic {topic}: {e}")
+
     def topic_exists(self, topic_name: str) -> bool:
         """
         Checks if a Kafka topic exists.
