@@ -1,4 +1,5 @@
 from logging import Logger
+from time import sleep
 from typing import Optional
 
 from confluent_kafka import Consumer, Producer, TopicPartition
@@ -167,6 +168,9 @@ class KafkaAPI(BaseModel):
         # Assign the consumer to the TopicPartitions
         self.consumer.assign(tps)
 
+        # Add a delay to ensure the consumer is assigned and messages are available
+        sleep(2)
+
         messages = []
         for i in range(n):
             msg = self.consumer.poll(1.0)
@@ -179,6 +183,9 @@ class KafkaAPI(BaseModel):
                 data = msg.value().decode("utf-8")
                 self.logger.info(f"Read data: {data}")
                 messages.append(self.deserialize_data(data, data_container))
+
+        if not messages:
+            raise IndexError("No messages were read from the topic")
 
         return messages if n > 1 else messages[0]
 

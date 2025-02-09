@@ -143,10 +143,11 @@ def test_write_data_and_read_data(kafka_api):
     """
     # Create a sample data to write
     data = TestData()
+    kafka_api.config.change_consumer_topic("test_producer")
+    kafka_api.subscribe("test_producer")
+
     # Write the data
     kafka_api.write_data(data)
-
-    kafka_api.config.change_consumer_topic("test_producer")
 
     read_data = kafka_api.read_data(TestData)
     assert read_data == data
