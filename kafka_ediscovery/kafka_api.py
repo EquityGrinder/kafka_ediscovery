@@ -31,6 +31,9 @@ class KafkaAPI(BaseModel):
     model_config: ConfigDict = {"arbitrary_types_allowed": True}
 
     def __del__(self) -> None:
+        """
+        Ensure the producer and consumer are properly closed when the object is deleted.
+        """
         if self.producer:
             self.producer.flush()
         if self.consumer:
@@ -38,8 +41,11 @@ class KafkaAPI(BaseModel):
 
     def __init__(self, consumer=None, producer=None):
         """
-        Todo: Check if more configuration options are needed for the producer
-        and consumer.
+        Initialize the KafkaAPI object with optional consumer and producer.
+
+        Args:
+            consumer (Optional[Consumer]): Optional Kafka consumer.
+            producer (Optional[Producer]): Optional Kafka producer.
         """
         BaseModel.__init__(self)
         if not self.config:
@@ -66,14 +72,16 @@ class KafkaAPI(BaseModel):
 
         self.subscribe(self.config.consumer_topic)
 
-    def serialize_data(self, data: BaseModel):
+    def serialize_data(self, data: BaseModel) -> str:
         """
-        Checks if data is a pydantic.BaseModel if yes returns the json string
+        Serialize the given data to a JSON string.
 
-        args
-            data : pydantic.BaseModel
+        Args:
+            data (BaseModel): The data to serialize.
+
+        Returns:
+            str: The serialized data as a JSON string.
         """
-
         serialized_data = data.model_dump_json()
         self.logger.info(f"Serialized data: {serialized_data}")
         return data.model_dump_json()
@@ -84,29 +92,25 @@ class KafkaAPI(BaseModel):
         model_class: BaseModel,
     ) -> BaseModel:
         """
-        Deserializes the data and returns the pydantic model
+        Deserialize the given JSON string to a Pydantic model.
 
         Args:
-            data: Serialized data
-            model_class: Pydantic model class to deserialize into
+            data (str): The JSON string to deserialize.
+            model_class (BaseModel): The Pydantic model class to deserialize into.
+
+        Returns:
+            BaseModel: The deserialized Pydantic model.
         """
         self.logger.info(f"Deserializing data: {data}")
         return model_class.model_validate_json(data)
 
     def write_data(self, data: BaseModel):
         """
-        Writes the given data to the Kafka topic.
+        Write the given data to the Kafka topic.
 
         Args:
-            data: The data to be written.
-
-        Returns:
-            None
-
-        Todo:
-            - flushing does not properly work
+            data (BaseModel): The data to write.
         """
-
         serialized_data = self.serialize_data(data)
         self.producer.produce(self.config.producer_topic, value=serialized_data)
         self.producer.flush()
@@ -118,23 +122,14 @@ class KafkaAPI(BaseModel):
         self, data_container: BaseModel, n: int = 1
     ) -> list[BaseModel]:
         """
-        Reads data from the Kafka consumer and returns the deserialized data.
-        It reads the last n messages.
-
-        This function is clearly not in the spirit of a stream processing
-        system.
-        It is more of a convenience function to read the last n messages.
+        Read the last n messages from the Kafka topic.
 
         Args:
-            data_container (BaseModel):The data container object
-                                        used for deserialization.
+            data_container (BaseModel): The data container object used for deserialization.
             n (int): The number of messages to read.
+
         Returns:
-            The deserialized data.
-
-
-        Todo :: Check which part of the code can be moved to a different method
-        and is not necessary for the read_data method to be executed every time
+            list[BaseModel]: The deserialized data.
         """
         self.logger.info(
             "Consume last "
@@ -189,8 +184,10 @@ class KafkaAPI(BaseModel):
 
     def get_end_offsets(self) -> list[TopicPartition]:
         """
-        This function should give the last offset for each partition in the topic
-        and set the consumer to the newest offset.
+        Get the end offsets for each partition in the topic.
+
+        Returns:
+            list[TopicPartition]: The end offsets for each partition.
         """
         self.consumer.poll(0)
         metadata = self.consumer.list_topics(self.config.consumer_topic)
@@ -233,16 +230,11 @@ class KafkaAPI(BaseModel):
         replication_factor: int = 1,
     ):
         """
-        Creates a Kafka topic with the specified number of partitions and replication factor.
-
-        The topic name is taken from the configuration (`self.config.producer_topic`).
+        Create a Kafka topic with the specified number of partitions and replication factor.
 
         Args:
             num_partitions (int): The number of partitions for the topic.
             replication_factor (int): The replication factor for the topic.
-
-        Returns:
-            None
         """
         new_topic = NewTopic(
             topic=self.config.producer_topic,
@@ -260,13 +252,10 @@ class KafkaAPI(BaseModel):
 
     def delete_topic(self, topic_name: str):
         """
-        Deletes a Kafka topic.
+        Delete a Kafka topic.
 
         Args:
-            topic_name: The name of the topic to delete.
-
-        Returns:
-            None
+            topic_name (str): The name of the topic to delete.
         """
         fs = self.admin_client.delete_topics([topic_name])
 
@@ -279,10 +268,10 @@ class KafkaAPI(BaseModel):
 
     def topic_exists(self, topic_name: str) -> bool:
         """
-        Checks if a Kafka topic exists.
+        Check if a Kafka topic exists.
 
         Args:
-            topic_name: The name of the topic to check.
+            topic_name (str): The name of the topic to check.
 
         Returns:
             bool: True if the topic exists, False otherwise.
@@ -294,11 +283,11 @@ class KafkaAPI(BaseModel):
 
     def consume_callback(self, data_container: BaseModel, callback):
         """
-        Continuously consumes messages from the Kafka topic and processes them using the provided callback.
+        Continuously consume messages from the Kafka topic and process them using the provided callback.
 
         Args:
-            data_container: The data model to deserialize the messages into.
-            callback: A function to process the consumed messages.
+            data_container (BaseModel): The data model to deserialize the messages into.
+            callback (function): A function to process the consumed messages.
         """
         self.subscribe(self.config.consumer_topic)
         self.logger.info(
@@ -326,7 +315,16 @@ class KafkaAPI(BaseModel):
     def read_since(
         self, data_container: BaseModel, offsets: list[TopicPartition]
     ) -> list[BaseModel]:
+        """
+        Read messages from the Kafka topic since the given offsets.
 
+        Args:
+            data_container (BaseModel): The data model to deserialize the messages into.
+            offsets (list[TopicPartition]): The offsets to start reading from.
+
+        Returns:
+            list[BaseModel]: The deserialized data.
+        """
         data_collection = []
         # assign to the offsets
         for tp in offsets:
@@ -359,29 +357,29 @@ class KafkaAPI(BaseModel):
 
     def change_consumer_topic(self, topic: str):
         """
-        Changes the consumer topic to the given topic.
+        Change the consumer topic to the given topic.
 
         Args:
-            topic: The new topic to subscribe to.
+            topic (str): The new topic to subscribe to.
         """
         self.config.change_consumer_topic(topic)
         self.subscribe(topic)
 
     def change_producer_topic(self, topic: str):
         """
-        Changes the producer topic to the given topic.
+        Change the producer topic to the given topic.
 
         Args:
-            topic: The new topic to produce to.
+            topic (str): The new topic to produce to.
         """
         self.config.change_producer_topic(topic)
 
     def subscribe(self, topic: str):
         """
-        Subscribes to the given topic and sets the consumer topic in the config.
+        Subscribe to the given topic and set the consumer topic in the config.
 
         Args:
-            topic: The topic to subscribe to.
+            topic (str): The topic to subscribe to.
         """
         self.config.consumer_topic = topic
         self.consumer.subscribe([topic])

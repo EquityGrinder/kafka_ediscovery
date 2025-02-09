@@ -26,6 +26,13 @@ def kafka_api():
 
 
 def test_consume_callback(kafka_api):
+    """
+    Test the consume_callback function to ensure it correctly consumes and processes messages.
+
+    Args:
+        kafka_api (KafkaAPI): The KafkaAPI instance to use for the test.
+    """
+
     def test_function(data):
         print(data)
         assert isinstance(data, TestData)
@@ -66,6 +73,12 @@ def test_consume_callback(kafka_api):
 
 
 def test_serialize_data(kafka_api):
+    """
+    Test the serialize_data function to ensure it correctly serializes data.
+
+    Args:
+        kafka_api (KafkaAPI): The KafkaAPI instance to use for the test.
+    """
     # Create a sample data to serialize
     data = TestData()
 
@@ -80,6 +93,12 @@ def test_serialize_data(kafka_api):
 
 
 def test_deserialize_data(kafka_api):
+    """
+    Test the deserialize_data function to ensure it correctly deserializes data.
+
+    Args:
+        kafka_api (KafkaAPI): The KafkaAPI instance to use for the test.
+    """
     # Create a sample serialized data
     test_string = TestData().model_dump_json()
     # Deserialize the data
@@ -98,6 +117,12 @@ def test_deserialize_data(kafka_api):
 
 
 def test_create_topic(kafka_api):
+    """
+    Test the create_topic function to ensure it correctly creates a Kafka topic.
+
+    Args:
+        kafka_api (KafkaAPI): The KafkaAPI instance to use for the test.
+    """
     kafka_api.config.producer_topic = "test_consumer"
 
     # Create the topic
@@ -110,6 +135,12 @@ def test_create_topic(kafka_api):
 
 
 def test_write_data_and_read_data(kafka_api):
+    """
+    Test the write_data and read_data functions to ensure they correctly write and read data.
+
+    Args:
+        kafka_api (KafkaAPI): The KafkaAPI instance to use for the test.
+    """
     # Create a sample data to write
     data = TestData()
     # Write the data
@@ -122,6 +153,12 @@ def test_write_data_and_read_data(kafka_api):
 
 
 def test_read_since(kafka_api):
+    """
+    Test the read_since function to ensure it correctly reads messages since a given offset.
+
+    Args:
+        kafka_api (KafkaAPI): The KafkaAPI instance to use for the test.
+    """
     test_data = TestData()
     kafka_api.change_consumer_topic(kafka_api.config.producer_topic)
 
@@ -142,6 +179,12 @@ def test_read_since(kafka_api):
 
 
 def test_change_consumer_topic(kafka_api):
+    """
+    Test the change_consumer_topic function to ensure it correctly changes the consumer topic.
+
+    Args:
+        kafka_api (KafkaAPI): The KafkaAPI instance to use for the test.
+    """
     new_topic = "new_consumer_topic"
     kafka_api.change_consumer_topic(new_topic)
     assert kafka_api.config.consumer_topic == new_topic
@@ -149,6 +192,12 @@ def test_change_consumer_topic(kafka_api):
 
 
 def test_change_producer_topic(kafka_api):
+    """
+    Test the change_producer_topic function to ensure it correctly changes the producer topic.
+
+    Args:
+        kafka_api (KafkaAPI): The KafkaAPI instance to use for the test.
+    """
     new_topic = "new_producer_topic"
     kafka_api.change_producer_topic(new_topic)
     assert kafka_api.config.producer_topic == new_topic
@@ -156,6 +205,12 @@ def test_change_producer_topic(kafka_api):
 
 
 def test_subscribe(kafka_api):
+    """
+    Test the subscribe function to ensure it correctly subscribes to a Kafka topic.
+
+    Args:
+        kafka_api (KafkaAPI): The KafkaAPI instance to use for the test.
+    """
     new_topic = "new_subscribe_topic"
 
     # Ensure the topic exists
@@ -171,6 +226,12 @@ def test_subscribe(kafka_api):
 
 
 def test_write_and_read_multiple_data(kafka_api):
+    """
+    Test writing and reading multiple data entries to ensure they are correctly processed.
+
+    Args:
+        kafka_api (KafkaAPI): The KafkaAPI instance to use for the test.
+    """
     data_list = [
         TestData(id=i, name=f"test_{i}", value=float(i), is_active=bool(i % 2))
         for i in range(5)
@@ -187,6 +248,12 @@ def test_write_and_read_multiple_data(kafka_api):
 
 
 def test_create_and_verify_topic(kafka_api):
+    """
+    Test the creation and verification of a Kafka topic.
+
+    Args:
+        kafka_api (KafkaAPI): The KafkaAPI instance to use for the test.
+    """
     topic_name = "verify_topic_creation"
     kafka_api.config.producer_topic = topic_name
     kafka_api.create_topic(num_partitions=1, replication_factor=1)
@@ -199,6 +266,12 @@ def test_create_and_verify_topic(kafka_api):
 
 
 def test_get_end_offsets(kafka_api):
+    """
+    Test the get_end_offsets function to ensure it correctly retrieves the end offsets for each partition.
+
+    Args:
+        kafka_api (KafkaAPI): The KafkaAPI instance to use for the test.
+    """
     # Set the same topic for both consumer and producer
     topic_name = "test_topic"
     kafka_api.config.producer_topic = topic_name
@@ -248,6 +321,12 @@ def test_get_end_offsets(kafka_api):
 
 
 def test_topic_exists(kafka_api):
+    """
+    Test the topic_exists function to ensure it correctly checks for the existence of a Kafka topic.
+
+    Args:
+        kafka_api (KafkaAPI): The KafkaAPI instance to use for the test.
+    """
     topic_name = "test_topic_exists"
     kafka_api.config.producer_topic = topic_name
 
@@ -296,6 +375,12 @@ def test_topic_exists(kafka_api):
 
 
 def test_delete_topic(kafka_api):
+    """
+    Test the delete_topic function to ensure it correctly deletes a Kafka topic.
+
+    Args:
+        kafka_api (KafkaAPI): The KafkaAPI instance to use for the test.
+    """
     topic_name = "test_topic_delete"
 
     # Create the topic
