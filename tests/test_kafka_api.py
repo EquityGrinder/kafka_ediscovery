@@ -213,7 +213,8 @@ def test_subscribe(kafka_api):
         kafka_api (KafkaAPI): The KafkaAPI instance to use for the test.
     """
     new_topic = "new_subscribe_topic"
-
+    kafka_api.config.producer_topic = new_topic
+    kafka_api.config.consumer_topic = new_topic
     # Ensure the topic exists
     if not kafka_api.topic_exists(new_topic):
         kafka_api.create_topic(num_partitions=1, replication_factor=1)
