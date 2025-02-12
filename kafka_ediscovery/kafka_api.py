@@ -1,11 +1,13 @@
+import asyncio
 from logging import Logger
 from time import sleep
 from typing import Optional
+import os
 
 from confluent_kafka import Consumer, Producer, TopicPartition
 from confluent_kafka.admin import AdminClient, NewTopic
 from pydantic import BaseModel, ConfigDict
-
+from types import FunctionType
 from kafka_ediscovery.config import KafkaConfig, LoggingConfig
 
 """
@@ -63,6 +65,14 @@ class KafkaAPI(BaseModel):
                 "auto.offset.reset": "latest",
             }
         )
+
+        # Ensure log file exists
+        if self.config.log_file:
+            log_dir = os.path.dirname(self.config.log_file)
+            if not os.path.exists(log_dir):
+                os.makedirs(log_dir)
+            if not os.path.exists(self.config.log_file):
+                open(self.config.log_file, 'a').close()
 
         logging_conf = LoggingConfig(log_file=self.config.log_file)
         self.logger = logging_conf.setup_logger(self.config.logger_name)
@@ -288,7 +298,7 @@ class KafkaAPI(BaseModel):
         self.logger.info(f"Topic {topic_name} exists: {exists}")
         return exists
 
-    def consume_callback(self, data_container: BaseModel, callback):
+    async def consume_callback(self, data_container: BaseModel, callback: FunctionType, flag:bool=False):
         """
         Continuously consume messages from the Kafka topic and process them using the provided callback.
 
@@ -296,15 +306,16 @@ class KafkaAPI(BaseModel):
             data_container (BaseModel): The data model to deserialize the messages into.
             callback (function): A function to process the consumed messages.
         """
-        self.subscribe(self.config.consumer_topic)
+        await self.subscribe(self.config.consumer_topic)
         self.logger.info(
             f"Started consuming messages from topic: {self.config.consumer_topic}"
         )
 
         try:
-            while True:
+            while flag:
                 msg = self.consumer.poll(1.0)
                 if msg is None:
+                    await asyncio.sleep(1)
                     continue
                 if msg.error():
                     self.logger.error(f"Consumer error: {msg.error()}")
@@ -313,11 +324,26 @@ class KafkaAPI(BaseModel):
                 self.logger.info(f"Received message: {data}")
                 deserialized_data = self.deserialize_data(data, data_container)
                 self.logger.info(f"Deserialized data: {deserialized_data}")
-                callback(deserialized_data)
-        except KeyboardInterrupt:
+                await callback(deserialized_data)
+        except asyncio.CancelledError:
             self.logger.info("Stopping Kafka consumer...")
         finally:
-            self.consumer.close()
+            if flag:
+                self.consumer.close()
+
+    async def subscribe(self, topic: str):
+        """
+        Subscribe to the given topic and set the consumer topic in the config.
+
+        Args:
+            topic (str): The topic to subscribe to.
+        """
+        if topic in self.consumer.subscription():
+            self.logger.info(f"Already subscribed to topic: {topic}")
+        else:
+            self.config.consumer_topic = topic
+            self.consumer.subscribe([topic])
+            self.logger.info(f"Subscribed to topic: {topic}")
 
     def read_since(
         self, data_container: BaseModel, offsets: list[TopicPartition]
@@ -380,15 +406,3 @@ class KafkaAPI(BaseModel):
             topic (str): The new topic to produce to.
         """
         self.config.change_producer_topic(topic)
-
-    def subscribe(self, topic: str):
-        """
-        Subscribe to the given topic and set the consumer topic in the config.
-
-        Args:
-            topic (str): The topic to subscribe to.
-        """
-        self.config.consumer_topic = topic
-        self.consumer.subscribe([topic])
-        self.consumer.poll(0)
-        self.logger.info(f"Subscribed to topic: {topic}")
